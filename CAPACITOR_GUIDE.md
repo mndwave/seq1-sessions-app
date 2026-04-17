@@ -54,6 +54,29 @@ genuinely native changes (a new Android permission, an icon update, a new hardwa
 - **Download page:** `https://sessions.seq1.net/app`
 - **Versioned builds:** `https://media.seq1.net/app/seq1-sessions-{sha}.apk` (90-day retention)
 
+## 🚨 GitHub Repository Not Yet Set Up (as of 2026-04-17)
+
+The `build-apk.yml` GitHub Actions workflow is written and ready, but `seq1-sessions-app` currently
+only has Gitea remotes (`gitea56`, `giteat13`). **GitHub Actions will not trigger until the repo
+is on GitHub.**
+
+**TODO (Monday 2026-04-22):**
+1. Create `github.com/mndwave/seq1-sessions-app` (private)
+2. Add a GitHub SSH key: `ssh-keygen -t ed25519 -C "seq1-sessions-app" -f ~/.ssh/seq1_sessions_github_key`
+3. Add deploy key to GitHub repo (Settings → Deploy keys → write access)
+4. Add to `~/.ssh/config`: `Host github.com-seq1-sessions` pointing at the new key
+5. `cd ~/seq1-sessions-app && git remote add origin git@github.com-seq1-sessions:mndwave/seq1-sessions-app.git`
+6. Add GitHub Actions secrets: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+   (same R2 credentials used in other repos — see `~/.claude/includes/api-credentials.includes`)
+7. `git push origin main` — first push triggers APK rebuild with camera plugin
+
+Until then, APK builds must be done locally (requires Java 17 — `sudo apt-get install openjdk-17-jdk`)
+or triggered manually via `gh workflow run` once the repo is on GitHub.
+
+**Current APK status:** v1.0.2 at `media.seq1.net/app/seq1-sessions-1.0.2.apk` does NOT include
+the `@capacitor/camera` plugin. The web-side `takeCameraPhoto()` code is live but will fall back
+to the HTML file picker (same as before) until the new APK is installed.
+
 ## GitHub Actions secrets required
 
 | Secret | Value source |
