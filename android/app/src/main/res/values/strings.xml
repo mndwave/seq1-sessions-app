@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SEQ1 Sessions</string>
+    <string name="title_activity_main">SEQ1 Sessions</string>
+    <string name="package_name">net.seq1.sessions</string>
+    <string name="custom_url_scheme">net.seq1.sessions</string>
+</resources>

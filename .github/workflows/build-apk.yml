@@ -1,0 +1,98 @@
+name: Build APK
+
+# Triggers: only when native config changes (not on every web push —
+# the web app updates live via server URL mode; no APK rebuild needed).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'capacitor.config.ts'
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual build'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Sync Capacitor (copies config into Android project)
+        run: npx cap sync android --no-open
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      # Disable WebContentsDebugging in production builds
+      - name: Disable WebContents debug flag
+        run: sed -i 's/webContentsDebuggingEnabled: true/webContentsDebuggingEnabled: false/' capacitor.config.ts
+
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: seq1-sessions-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 90
+
+      # Upload to R2 so sessions.seq1.net/app/download always serves the latest.
+      # All ${{ }} expressions are passed via env vars to avoid injection risk.
+      - name: Upload APK to R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          pip install awscli --quiet
+          aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          # Versioned copy for rollback
+          aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-${COMMIT_SHA}.apk" \
+            --endpoint-url "$ENDPOINT"
+          # Latest pointer — what the download page links to
+          aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
+            --endpoint-url "$ENDPOINT"
+          echo "Uploaded: seq1-sessions-latest.apk (commit ${COMMIT_SHA})"
+
+      - name: Build summary
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## APK Build Complete"
+            echo "- Commit: ${COMMIT_SHA}"
+            echo "- Download: https://media.seq1.net/app/seq1-sessions-latest.apk"
+          } >> "$GITHUB_STEP_SUMMARY"
