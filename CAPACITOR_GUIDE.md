@@ -54,6 +54,65 @@ genuinely native changes (a new Android permission, an icon update, a new hardwa
 - **Download page:** `https://sessions.seq1.net/app`
 - **Versioned builds:** `https://media.seq1.net/app/seq1-sessions-{sha}.apk` (90-day retention)
 
+## Local Build — Temporary Method Until GitHub CI Is Wired Up
+
+Until `seq1-sessions-app` is on GitHub and Actions are configured, build the APK locally.
+
+### Requirements
+
+- Java 17: `sudo apt-get install openjdk-17-jdk`
+- Android SDK: set `ANDROID_HOME` (GitHub Actions uses `android-actions/setup-android@v3`)
+- AWS CLI: `pip install awscli` (for R2 upload)
+- R2 credentials from `~/.claude/includes/api-credentials.includes`
+
+### Build and upload (release APK)
+
+```bash
+cd ~/seq1-sessions-app
+
+# 1. Sync capacitor config into Android project
+npx cap sync android --no-open
+
+# 2. Build release APK (requires keystore at seq1-sessions-release.keystore)
+cd android
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew assembleRelease --no-daemon
+cd ..
+
+# 3. The APK is at:
+APK="android/app/build/outputs/apk/release/app-release.apk"
+
+# 4. Upload to R2
+R2_ACCOUNT_ID="..."        # from api-credentials.includes
+R2_ACCESS_KEY_ID="..."
+R2_SECRET_ACCESS_KEY="..."
+R2_BUCKET="media"
+ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+VERSION=$(grep 'versionName' android/app/build.gradle | grep -o '"[^"]*"' | tr -d '"')
+
+aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
+aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+
+aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-${VERSION}.apk" \
+  --endpoint-url "$ENDPOINT" --region auto \
+  --content-type "application/vnd.android.package-archive"
+
+aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
+  --endpoint-url "$ENDPOINT" --region auto \
+  --content-type "application/vnd.android.package-archive"
+
+echo "Uploaded seq1-sessions-${VERSION}.apk and latest"
+```
+
+Then update `CURRENT_VERSION` in `admin-react/app/app/page.tsx` to match and push.
+
+### ⚠️ Note on build-apk.yml
+
+The GitHub Actions workflow currently runs `assembleDebug` — a debug build. Once the GitHub repo
+is set up, update the workflow to run `assembleRelease` instead (it already has the signing config
+in `build.gradle`). Debug APKs cause the Obtainium signing cert trap (see above).
+
+---
+
 ## 🚨 GitHub Repository Not Yet Set Up (as of 2026-04-17)
 
 The `build-apk.yml` GitHub Actions workflow is written and ready, but `seq1-sessions-app` currently
