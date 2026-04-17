@@ -5,14 +5,18 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Terminal prompt chevron ">" — retro-teal -->
-    <path
-        android:fillColor="#2dd4bf"
-        android:pathData="M18,30 L42,54 L18,78 L26,78 L50,54 L26,30 Z" />
+    <!-- >_ terminal prompt — retro-teal on transparent (background layer is stone-900) -->
 
-    <!-- Cursor underline — path instead of rect -->
+    <!-- ">" chevron: open stroke rendered as filled outline path -->
+    <!-- Outer shape: two arms of the chevron with 7dp stroke weight -->
     <path
         android:fillColor="#2dd4bf"
-        android:fillAlpha="0.8"
-        android:pathData="M50,70 L90,70 L90,78 L50,78 Z" />
+        android:pathData="
+          M16,25 L16,32 L37,54 L16,76 L16,83
+          L23,83 L47,57.5 L47,50.5 L23,25 Z" />
+
+    <!-- "_" underline bar -->
+    <path
+        android:fillColor="#2dd4bf"
+        android:pathData="M55,74 L92,74 L92,81 L55,81 Z" />
 </vector>
