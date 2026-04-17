@@ -163,6 +163,44 @@ Key differences vs debug:
 - Smaller APK (debug symbols stripped)
 - `versionName` / `versionCode` matter for auto-update detection (bump versionCode on every release)
 
+## Obtainium — update loop and silent install failure
+
+### The debug→release signing trap
+
+Android ties an installed app to the signing certificate of its APK. If you install a **debug APK** (signed with the default Android debug keystore) and then try to update via a **release APK** (signed with your own keystore), Android will **silently reject the install**.
+
+The symptoms:
+- Obtainium prompts for update on every check, forever
+- The icon never changes despite "updating"
+- The old APK version is still what's actually running
+
+**Why it looks like it worked:** The Android package installer UI shows "install complete" in some cases, but the actual installation fails. Obtainium doesn't detect this and re-prompts on the next check.
+
+**Fix (one-time migration):**
+1. Settings → Apps → SEQ1 Sessions → Uninstall (full uninstall, not "disable")
+2. Install the release APK fresh from `sessions.seq1.net/app`
+3. Obtainium will now track the release-signed version and updates will work
+
+**Prevention:** Never publish a debug APK to users. Once users have it installed, you can never push a release APK via update — they must manually uninstall first. Use `assembleRelease` from the start.
+
+### Obtainium version comparison
+
+Obtainium HTML source type:
+1. Scrapes the source URL (e.g. `sessions.seq1.net/app`)
+2. Finds APK links matching `apkFilterRegEx`
+3. Extracts the version string using `versionExtractionRegEx`
+4. Compares the extracted string against the installed APK's `versionName`
+
+**The `versionName` in `build.gradle` must match what the regex extracts from the filename.**
+
+| build.gradle `versionName` | APK filename | Regex extracts | Match? |
+|---|---|---|---|
+| `1.0.2` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ✅ No prompt |
+| `1.0` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ❌ Always prompts |
+| `2` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ❌ Always prompts |
+
+**Always keep `versionName` and the APK filename in sync.** The `CURRENT_VERSION` constant in `admin-react/app/app/page.tsx` and the `versionName` in `android/app/build.gradle` must be identical.
+
 ## Known anti-patterns
 
 ### ❌ Using `next export` for SSR apps
