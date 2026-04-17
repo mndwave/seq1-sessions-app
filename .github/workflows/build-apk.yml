@@ -81,10 +81,12 @@ jobs:
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           # Versioned copy for rollback
           aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-${COMMIT_SHA}.apk" \
-            --endpoint-url "$ENDPOINT"
+            --endpoint-url "$ENDPOINT" --region auto \
+            --content-type "application/vnd.android.package-archive"
           # Latest pointer — what the download page links to
           aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
-            --endpoint-url "$ENDPOINT"
+            --endpoint-url "$ENDPOINT" --region auto \
+            --content-type "application/vnd.android.package-archive"
           echo "Uploaded: seq1-sessions-latest.apk (commit ${COMMIT_SHA})"
 
       - name: Build summary
