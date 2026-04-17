@@ -21,9 +21,7 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     // Capture input is needed for the voice recording UI.
     captureInput: true,
-    // WebContentsDebuggingEnabled makes Chrome DevTools attach to the WebView.
-    // Set to false in production builds via GitHub Actions env var.
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     // Filesystem plugin: used for buffering voice chunks locally.
