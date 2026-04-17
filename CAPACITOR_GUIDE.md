@@ -27,17 +27,26 @@ Only use static bundle if you genuinely need offline-first behaviour.
 
 ## When to rebuild the APK
 
-**APK rebuild required:**
-- Changes to `capacitor.config.ts`
-- Changes to `android/` (permissions, plugins, theme, icons)
-- Adding/upgrading Capacitor plugins
+**The rule in one sentence:** rebuild only when the native shell changes, never when the web app changes.
 
-**APK rebuild NOT required:**
-- Any change to `sessions.seq1.net` web code
-- New features, UI changes, bug fixes in the web app
-- Backend changes
+| Change type | APK rebuild needed? |
+|---|---|
+| `capacitor.config.ts` edited | ✅ Yes |
+| `android/` directory edited (permissions, plugins, icons, theme) | ✅ Yes |
+| Adding or upgrading a Capacitor plugin | ✅ Yes |
+| Keystore / signing config changed | ✅ Yes |
+| Any change to `sessions.seq1.net` web code | ❌ No — live instantly |
+| New features, UI changes, bug fixes in admin-react | ❌ No |
+| Backend seq1-healer changes | ❌ No |
+| `admin-react/` code changes (including this guide) | ❌ No |
 
-The GitHub Actions workflow (`build-apk.yml`) is path-scoped to enforce this automatically.
+The GitHub Actions workflow (`build-apk.yml`) is path-scoped to enforce this automatically — it only triggers on `android/**` and `capacitor.config.ts`, never on web code paths.
+
+**Why this matters for day-to-day work on SEQ1 Sessions:**
+`sessions.seq1.net` is the live web app. When you fix a bug or add a feature there, the APK users
+pick it up immediately on next app open — no rebuild, no redistribution, no Obtainium update prompt.
+The APK is just a shell that loads the live URL. The only time you touch the APK is when something
+genuinely native changes (a new Android permission, an icon update, a new hardware plugin).
 
 ## APK distribution
 
@@ -251,3 +260,377 @@ seq1-sessions-app/
 └── .github/workflows/
     └── build-apk.yml            ← Path-scoped trigger; uploads to R2
 ```
+
+---
+
+## Verified Canonical State — SEQ1 Sessions v1.0.2 (audited 2026-04-17)
+
+This section documents the confirmed-correct configuration after a full audit of the release APK at
+`https://media.seq1.net/app/seq1-sessions-1.0.2.apk`. All 7 layers PASS. Do not change these
+without understanding the anti-pattern each one fixes.
+
+### Layer 1 — Release signing (NOT debug)
+
+**File:** `android/app/build.gradle`
+
+```groovy
+signingConfigs {
+    release {
+        storeFile file('../../seq1-sessions-release.keystore')
+        storePassword 'seq1sessions2026'
+        keyAlias 'seq1sessions'
+        keyPassword 'seq1sessions2026'
+    }
+}
+defaultConfig {
+    versionCode 2
+    versionName "1.0.2"
+    ...
+}
+buildTypes {
+    release {
+        signingConfig signingConfigs.release
+    }
+}
+```
+
+**Why this matters:** Android ties an installed app to its signing certificate. The debug keystore
+(shared across all Android devs) and the release keystore are different certificates. If a user has
+the debug APK installed, Android silently rejects the release APK as an update — the installer shows
+"complete" but the old APK is still what's running. Obtainium then re-prompts on every check
+forever (infinite update loop).
+
+**Keystore location:** `seq1-sessions-app/seq1-sessions-release.keystore`
+Generated with: `keytool -genkey -v -keystore seq1-sessions-release.keystore -alias seq1sessions -keyalg RSA -keysize 2048 -validity 10950 ...`
+**KEEP THIS FILE. Loss = can never update the app for existing users without full uninstall.**
+
+---
+
+### Layer 2 — Version numbers in sync
+
+Three places must have identical version strings:
+
+| File | Key | Value |
+|---|---|---|
+| `android/app/build.gradle` | `versionName` | `"1.0.2"` |
+| `capacitor.config.ts` | `APP_VERSION` | `'1.0.2'` |
+| `admin-react/app/app/page.tsx` | `CURRENT_VERSION` | `'1.0.2'` |
+
+**Why three places:** Obtainium scrapes the download page HTML for an APK link matching the regex
+`seq1-sessions-([0-9]+\.[0-9]+\.[0-9]+)\.apk`, extracts the version string, then compares it
+against the installed APK's `versionName` from `build.gradle`. If they differ even slightly
+(`1.0` vs `1.0.2`), Obtainium always sees a newer version available → permanent update loop.
+
+**`versionCode`** (`2`, an integer) is used by Android internally for update ordering. Increment it
+every release even if the patch number doesn't change. It must only ever go up.
+
+---
+
+### Layer 3 — Adaptive icon XML (the critical layer)
+
+**File:** `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>
+```
+
+(Same content in `mipmap-anydpi-v26/ic_launcher_round.xml`)
+
+**Why `@drawable/` not `@mipmap/`:** On Android 8.0+ (API 26+), `mipmap-anydpi-v26/ic_launcher.xml`
+takes precedence over ALL density-specific PNGs for the launcher icon. Capacitor's default
+template generates this XML with `@mipmap/ic_launcher_foreground` — which points to the old
+robot PNG files in each `mipmap-{density}/` directory. Replacing those PNGs has ZERO effect
+because the XML is never updated to point at the new files. The fix: point the foreground at
+`@drawable/ic_launcher_foreground` (the vector XML in `drawable-v24/`).
+
+**Anti-pattern that burned multiple debugging sessions:**
+```xml
+<!-- ❌ WRONG — overridden by the old Capacitor robot PNGs -->
+<foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+
+<!-- ✅ CORRECT — uses the vector drawable you actually want -->
+<foreground android:drawable="@drawable/ic_launcher_foreground"/>
+```
+
+---
+
+### Layer 4 — Foreground vector drawable
+
+**File:** `android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml`
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- >_ terminal prompt — retro-teal on transparent (background layer is stone-900) -->
+
+    <!-- ">" chevron -->
+    <path
+        android:fillColor="#2dd4bf"
+        android:pathData="M16,25 L16,32 L37,54 L16,76 L16,83 L23,83 L47,57.5 L47,50.5 L23,25 Z" />
+
+    <!-- "_" underline bar -->
+    <path
+        android:fillColor="#2dd4bf"
+        android:pathData="M55,74 L92,74 L92,81 L55,81 Z" />
+</vector>
+```
+
+**Important:** Android vector drawables do NOT support `<rect>` elements — only `<path>`, `<group>`,
+`<clip-path>`, and `<gradient>`. The underline bar must be a `<path>` with explicit corner
+coordinates, not `<rect x=... y=... width=... height=.../>`. AAPT build error if you use `<rect>`.
+
+The 108×108dp canvas matches Android's adaptive icon safe zone spec. The design stays within
+the inner 72×72dp circle to avoid clipping on rounded launchers.
+
+---
+
+### Layer 5 — Background colour
+
+**File:** `android/app/src/main/res/values/ic_launcher_background.xml`
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#1c1917</color>
+</resources>
+```
+
+`#1c1917` = Tailwind `stone-900` = the retro terminal background. Default was `#FFFFFF` (white).
+The `@color/ic_launcher_background` reference in the adaptive icon XML maps to this value.
+
+---
+
+### Layer 6 — Legacy PNG fallback (Android < 8.0)
+
+Five density buckets present and correct:
+
+```
+android/app/src/main/res/
+├── mipmap-mdpi/ic_launcher.png       (48×48)
+├── mipmap-hdpi/ic_launcher.png       (72×72)
+├── mipmap-xhdpi/ic_launcher.png      (96×96)
+├── mipmap-xxhdpi/ic_launcher.png     (144×144)
+└── mipmap-xxxhdpi/ic_launcher.png    (192×192)
+```
+
+These are used on Android 7.1 and below where adaptive icons aren't supported. They're also used
+in the app drawer on some Android 8+ launchers that fall back to the PNG for certain display modes
+(e.g. notification badge, recent apps thumbnail). They should show the `>_` design too.
+
+**Verify the xxxhdpi PNG (192×192) inside any built APK:**
+```bash
+for f in $(unzip -l app-release.apk | awk '{print $4}' | grep "\.png$"); do
+  unzip -p app-release.apk "$f" > /tmp/chk.png 2>/dev/null
+  dims=$(identify /tmp/chk.png 2>/dev/null | awk '{print $3}')
+  [ "$dims" = "192x192" ] && echo "Found 192px: $f" && break
+done
+```
+
+---
+
+### Layer 7 — Obtainium configuration
+
+Obtainium scrapes `sessions.seq1.net/app` (the download page) to detect new versions.
+
+| Setting | Value | Why |
+|---|---|---|
+| Source URL | `https://sessions.seq1.net/app` | SSR-rendered HTML contains APK links |
+| Source type | HTML | Not GitHub, not F-Droid |
+| APK link regex | `seq1-sessions-([0-9]+\.[0-9]+\.[0-9]+)\.apk` | Matches versioned filenames |
+| Version extraction | Same regex, group 1 | Extracts `1.0.2` from filename |
+
+One-tap import via: `https://sessions.seq1.net/app/obtainium.json`
+
+**Why SSR matters:** Obtainium fetches the HTML source and runs the regex against it. If the page
+were client-rendered (SPA), Obtainium would see an empty shell with no APK links. The Next.js page
+is server-rendered, so the `<a href="...seq1-sessions-1.0.2.apk">` tag is present in the initial
+HTML. This is why the source type is HTML, not JavaScript.
+
+**Alternative import path** (for users without Obtainium set up):
+```json
+// sessions.seq1.net/app/obtainium.json
+{
+  "id": "net.seq1.sessions",
+  "url": "https://sessions.seq1.net/app",
+  "author": "SEQ1",
+  "name": "SEQ1 Sessions",
+  "additionalSettings": "{\"filterRegExp\":\"seq1-sessions-([0-9]+\\\\.[0-9]+\\\\.[0-9]+)\\\\.apk\"}"
+}
+```
+
+---
+
+## Android Launcher Icon Cache — Definitive Diagnosis
+
+After a fresh install of the release APK (confirmed by permission re-prompts on first launch),
+if the home screen still shows the old icon, this is **exclusively a launcher cache issue**.
+The APK is correct. This is not a build problem.
+
+### Why it happens
+
+Android launchers (Pixel Launcher, One UI Home, etc.) maintain their own icon cache in a SQLite
+database stored inside the launcher app's private data directory. This cache:
+
+- Survives APK uninstall (the launcher retains the cached bitmap)
+- Survives reinstall of the same package ID
+- Sometimes survives a full device restart
+
+The launcher checks the cache before opening the APK to extract the icon. If the package name
+matches a cached entry, it uses the cached bitmap without touching the APK.
+
+### Proof the APK is correct (check before blaming the build)
+
+Settings → Apps → SEQ1 Sessions → the icon shown in the app info screen is read **directly from
+the APK**, bypassing the launcher cache. If this shows `>_`, the APK is correct and it's a
+launcher cache issue.
+
+### How to fix (on device)
+
+**Option A — Clear launcher cache (recommended):**
+1. Settings → Apps → (find your launcher, e.g. "Pixel Launcher" or "One UI Home")
+2. Storage → Clear Cache
+3. Return to home screen — icon should update immediately
+
+Common launcher package names:
+- Pixel / stock Android: `com.google.android.apps.nexuslauncher`
+- Samsung: `com.sec.android.app.launcher`
+- OnePlus: `net.oneplus.launcher`
+
+**Option B — Restart phone:**
+Most launchers reload their icon cache on boot. Usually resolves within one restart.
+
+**Option C — Long-press home screen → launcher settings → clear icon cache**
+(Not available on all launchers)
+
+### Resolution timeline
+
+The launcher cache will self-correct through one of:
+- First device restart after the fresh install
+- Manual cache clear as above
+- Some launchers re-validate their cache periodically (days, not weeks)
+
+**This requires no code changes.** The APK at `media.seq1.net/app/seq1-sessions-1.0.2.apk`
+has been verified to contain the correct `>_` icon at all layers.
+
+---
+
+## Obtainium Infinite Update Loop — Root Cause & Prevention
+
+### Root cause: debug → release signing cert change
+
+When Obtainium installs a release APK to replace a debug APK (different signing certificate),
+Android silently rejects the installation. The package installer UI may show "complete" but
+the old APK is still running. Obtainium has no way to detect this failure, so on the next
+check it sees the installed version doesn't match the available version → prompts to update
+again. This repeats forever.
+
+### One-time fix (migration from debug to release)
+
+1. Settings → Apps → SEQ1 Sessions → Uninstall (full uninstall, not disable)
+2. In Obtainium: remove the SEQ1 Sessions entry
+3. Go to `sessions.seq1.net/app` in the browser
+4. Download and install the APK directly
+5. Re-add SEQ1 Sessions in Obtainium
+6. Future Obtainium updates will work (consistent release signing)
+
+### Prevention going forward
+
+The release keystore (`seq1-sessions-release.keystore`) must be used for every APK build, forever.
+If the keystore is lost, existing users can never receive updates via Obtainium (or any other
+update mechanism) — they must uninstall and reinstall manually.
+
+**Store the keystore file safely. It is in `seq1-sessions-app/seq1-sessions-release.keystore`
+and is NOT committed to git (checked: not in `.gitignore` yet — add it if the file appears in
+`git status`, since the password is already in `build.gradle` which IS in git).**
+
+### Version number drift loop
+
+If `versionName` in `build.gradle` (`1.0.2`) doesn't exactly match what Obtainium's regex
+extracts from the filename (`1.0.2` from `seq1-sessions-1.0.2.apk`), Obtainium always thinks
+there's a newer version. They must be identical strings.
+
+| `versionName` | APK filename | Obtainium behaviour |
+|---|---|---|
+| `1.0.2` | `seq1-sessions-1.0.2.apk` | ✅ Sees match, no update prompt |
+| `1.0` | `seq1-sessions-1.0.2.apk` | ❌ Always prompts (strings differ) |
+| `2` | `seq1-sessions-1.0.2.apk` | ❌ Always prompts |
+
+---
+
+## Amber / NIP-55 — APK Auth Loop Anti-Pattern
+
+### The problem
+
+In the APK, `window.nostr` is the Amber bridge. Every call to `window.nostr.signEvent()` shows
+a native Android approval dialog. The sessions UI makes 8+ authenticated API calls on page load.
+Result: Amber pops approval dialogs in a continuous loop — you approve one, the next fires
+immediately, the page never finishes loading.
+
+### The fix
+
+**File:** `admin-react/lib/nostr-client-auth.ts`
+
+```typescript
+// Detect APK context — window.Capacitor is set by the Capacitor WebView layer
+const isCapacitorContext = typeof window !== 'undefined' && !!(window as any).Capacitor
+
+if (!isCapacitorContext && typeof window !== 'undefined' && (window as any).nostr) {
+  // Use browser extension (e.g. Alby) — safe, no popup per request
+  try {
+    const signedEvent = await (window as any).nostr.signEvent(unsignedEvent)
+    ...
+  }
+}
+
+// In APK context, fall through to nsec-based signing (no popup, no Amber)
+```
+
+**Why NIP-55 (Amber) is wrong for NIP-98 HTTP auth:** NIP-55 is designed for high-trust operations
+(signing posts, managing follows) where a user approval dialog is appropriate. NIP-98 generates
+a short-lived signed event as a bearer token for HTTP auth — it's a technical mechanism, not a
+user action. Showing an Amber dialog for every API request is both the wrong UX and practically
+unusable. In APK context, the bootstrapped nsec (stored in localStorage by the login flow) is
+used directly for HTTP auth signing. Amber is still used for Nostr identity operations.
+
+---
+
+## Release Checklist — Before Publishing a New APK Version
+
+When bumping from e.g. `1.0.2` → `1.1.0`:
+
+- [ ] Update `versionName` in `android/app/build.gradle` (e.g. `"1.1.0"`)
+- [ ] Increment `versionCode` in `android/app/build.gradle` (e.g. `3`)
+- [ ] Update `APP_VERSION` in `capacitor.config.ts` (e.g. `'1.1.0'`)
+- [ ] Update `CURRENT_VERSION` in `admin-react/app/app/page.tsx` (e.g. `'1.1.0'`)
+- [ ] Verify all three match exactly
+- [ ] Push to `main` branch → GitHub Actions builds + uploads to R2
+- [ ] Verify APK appears at `https://media.seq1.net/app/seq1-sessions-1.1.0.apk`
+- [ ] Verify download page at `sessions.seq1.net/app` shows new version number
+- [ ] Verify Obtainium detects update (scrape test: `curl -s https://sessions.seq1.net/app | grep seq1-sessions`)
+
+**DO NOT** publish a debug APK. Once users have it installed, updates won't work until they
+manually uninstall. The GitHub Actions workflow builds `assembleRelease` with the keystore
+from the `BUILD_KEYSTORE_BASE64` secret — this produces the correctly signed release APK.
+
+---
+
+## Summary of Anti-Patterns Resolved (2026-04-17)
+
+| Anti-pattern | Symptom | Root cause | Fix |
+|---|---|---|---|
+| `@mipmap/ic_launcher_foreground` in adaptive XML | Icon unchanged despite PNG regeneration | Adaptive XML overrides PNGs on Android 8+; still pointing at old robot PNGs | Changed to `@drawable/ic_launcher_foreground` |
+| `<rect>` in vector drawable | AAPT build error | Android VectorDrawable doesn't support `<rect>` | Replaced with `<path>` coordinates |
+| Background `#FFFFFF` (white) | White background behind `>_` design | Capacitor default; never changed | Changed to `#1c1917` (stone-900) |
+| Debug APK distributed to users | Obtainium update loop forever | Signing cert mismatch; Android silently rejects update | Migrate: full uninstall → fresh release install |
+| `versionName` mismatch | Obtainium always prompts to update | Obtainium compares extracted filename version vs installed versionName | Keep all three version constants identical |
+| `window.nostr` used in APK context | Amber approval dialog loop on every page load | NIP-55 designed for user-facing ops, not HTTP auth tokens | Skip `window.nostr` when `window.Capacitor` is set |
+| Launcher icon cache | Icon still old after confirmed fresh install | Launcher caches icon bitmaps independently of APK | Clear launcher app cache or restart device |

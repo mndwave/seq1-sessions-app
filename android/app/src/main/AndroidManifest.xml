@@ -52,6 +52,9 @@
     <!-- Vibration: tactile feedback on tap-to-record press -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Camera: direct native camera access via @capacitor/camera plugin -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Android 11+ package visibility: required to launch Amber (NIP-55 Nostr signer) -->
     <queries>
         <package android:name="com.greenart7c3.nostrsigner" />
