@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '2.0.0';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
@@ -22,11 +22,9 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
     // Prevent overscroll glow/bounce effect — this is an app, not a webpage.
     overScrollMode: 'never',
-    // Cap 7 / Android 15: disable Capacitor's automatic margin-based inset handling.
-    // sessions.seq1.net handles system bar insets via CSS env(safe-area-inset-*) — the
-    // Capacitor margin approach and CSS env() are mutually exclusive; margins would zero
-    // out the CSS values, breaking the .pb-safe recording bar layout.
-    adjustMarginsForEdgeToEdge: 'disable',
+    // Cap 8: edge-to-edge is always enabled. sessions.seq1.net handles system bar insets
+    // via CSS env(safe-area-inset-*) which Capacitor 8 correctly passes through.
+    // adjustMarginsForEdgeToEdge removed from Cap 8 API — CSS env() approach is correct.
   },
   plugins: {
     SplashScreen: {

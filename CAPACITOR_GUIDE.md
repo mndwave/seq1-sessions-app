@@ -132,9 +132,9 @@ is on GitHub.**
 Until then, APK builds must be done locally (requires Java 17 — `sudo apt-get install openjdk-17-jdk`)
 or triggered manually via `gh workflow run` once the repo is on GitHub.
 
-**Current APK status:** v1.0.2 at `media.seq1.net/app/seq1-sessions-1.0.2.apk` does NOT include
-the `@capacitor/camera` plugin. The web-side `takeCameraPhoto()` code is live but will fall back
-to the HTML file picker (same as before) until the new APK is installed.
+**Current APK status:** v1.0.2 is the last built APK (`media.seq1.net/app/seq1-sessions-1.0.2.apk`).
+v2.0.0 source (Capacitor 8) is ready but the APK has not yet been built — awaiting GitHub Actions
+setup (2026-04-22). All @capacitor/* plugins are now v8; includes @capacitor/keyboard (new in Cap 8).
 
 ## GitHub Actions secrets required
 
@@ -345,10 +345,15 @@ seq1-sessions-app/
 
 ---
 
-## Verified Canonical State — SEQ1 Sessions v1.0.2 (audited 2026-04-17)
+## Verified Canonical State — SEQ1 Sessions v2.0.0 (Capacitor 8 migration 2026-04-18)
 
-This section documents the confirmed-correct configuration after a full audit of the release APK at
-`https://media.seq1.net/app/seq1-sessions-1.0.2.apk`. All 7 layers PASS. Do not change these
+**Capacitor 8 migration applied 2026-04-18:** All @capacitor/* packages updated from v7 to v8. Key
+changes: `@capacitor/keyboard` added (keyboard UX improvements), `adjustMarginsForEdgeToEdge` removed
+(no longer in Cap 8 API — CSS env(safe-area-inset-*) handles insets directly), `proguard-android.txt`
+→ `proguard-android-optimize.txt` (AGP 9.0 compatibility). APK not yet rebuilt — pending GitHub
+Actions setup (see GitHub section above). v1.0.2 was the last built APK.
+
+This section documents the confirmed-correct configuration. All 7 layers PASS. Do not change these
 without understanding the anti-pattern each one fixes.
 
 ### Layer 1 — Release signing (NOT debug)
@@ -365,8 +370,8 @@ signingConfigs {
     }
 }
 defaultConfig {
-    versionCode 2
-    versionName "1.0.2"
+    versionCode 3
+    versionName "2.0.0"
     ...
 }
 buildTypes {
@@ -397,16 +402,16 @@ Three places must have identical version strings:
 
 | File | Key | Value |
 |---|---|---|
-| `android/app/build.gradle` | `versionName` | `"1.0.2"` |
-| `capacitor.config.ts` | `APP_VERSION` | `'1.0.2'` |
-| `admin-react/app/app/page.tsx` | `CURRENT_VERSION` | `'1.0.2'` |
+| `android/app/build.gradle` | `versionName` | `"2.0.0"` |
+| `capacitor.config.ts` | `APP_VERSION` | `'2.0.0'` |
+| `admin-react/app/app/page.tsx` | `CURRENT_VERSION` | `'2.0.0'` |
 
 **Why three places:** Obtainium scrapes the download page HTML for an APK link matching the regex
 `seq1-sessions-([0-9]+\.[0-9]+\.[0-9]+)\.apk`, extracts the version string, then compares it
 against the installed APK's `versionName` from `build.gradle`. If they differ even slightly
 (`1.0` vs `1.0.2`), Obtainium always sees a newer version available → permanent update loop.
 
-**`versionCode`** (`2`, an integer) is used by Android internally for update ordering. Increment it
+**`versionCode`** (`3`, an integer) is used by Android internally for update ordering. Increment it
 every release even if the patch number doesn't change. It must only ever go up.
 
 ---
