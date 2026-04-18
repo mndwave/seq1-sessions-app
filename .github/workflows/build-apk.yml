@@ -5,16 +5,6 @@ name: Build APK
 on:
   push:
     branches: [main]
-    paths:
-      - 'capacitor.config.ts'
-      - 'android/**'
-      - '.github/workflows/build-apk.yml'
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual build'
-        required: false
-        default: 'Manual trigger'
 
 permissions:
   contents: write  # required to create GitHub Releases
