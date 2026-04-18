@@ -54,7 +54,8 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Disable WebContents debug flag
-        run: sed -i 's/webContentsDebuggingEnabled: true/webContentsDebuggingEnabled: false/' capacitor.config.ts
+        run: |
+          sed -i 's/webContentsDebuggingEnabled: true/webContentsDebuggingEnabled: false/' capacitor.config.ts
 
       - name: Stamp version into build.gradle
         env:
