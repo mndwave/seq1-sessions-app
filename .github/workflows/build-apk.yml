@@ -72,7 +72,7 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release-unsigned.apk seq1-sessions.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk seq1-sessions.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
