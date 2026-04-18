@@ -358,10 +358,10 @@ without understanding the anti-pattern each one fixes.
 ```groovy
 signingConfigs {
     release {
-        storeFile file('../../seq1-sessions-release.keystore')
-        storePassword 'seq1sessions2026'
-        keyAlias 'seq1sessions'
-        keyPassword 'seq1sessions2026'
+        storeFile file("../../seq1-sessions-release.keystore")
+        storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+        keyAlias System.getenv("KEY_ALIAS") ?: ""
+        keyPassword System.getenv("KEY_PASSWORD") ?: ""
     }
 }
 defaultConfig {
@@ -375,6 +375,9 @@ buildTypes {
     }
 }
 ```
+
+Signing credentials are stored as GitHub Actions secrets (`KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
+The keystore itself is base64-encoded as `KEYSTORE_BASE64` and decoded by the CI workflow before the Gradle build.
 
 **Why this matters:** Android ties an installed app to its signing certificate. The debug keystore
 (shared across all Android devs) and the release keystore are different certificates. If a user has
@@ -630,9 +633,10 @@ The release keystore (`seq1-sessions-release.keystore`) must be used for every A
 If the keystore is lost, existing users can never receive updates via Obtainium (or any other
 update mechanism) — they must uninstall and reinstall manually.
 
-**Store the keystore file safely. It is in `seq1-sessions-app/seq1-sessions-release.keystore`
-and is NOT committed to git (checked: not in `.gitignore` yet — add it if the file appears in
-`git status`, since the password is already in `build.gradle` which IS in git).**
+**Store the keystore file safely. It is NOT committed to git (`*.keystore` is in `.gitignore`).
+The keystore is stored as a base64-encoded GitHub Actions secret (`KEYSTORE_BASE64`). The
+credentials are stored as `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` secrets. Loss of the
+keystore = can never update the app for existing users without full uninstall.**
 
 ### Version number drift loop
 
