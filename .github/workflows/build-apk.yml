@@ -23,7 +23,8 @@ jobs:
         run: |
           # Date-based version: YYYY.MM.DD.HHMM — Obtainium uses this to detect updates
           VERSION=$(date -u +"%Y.%m.%d.%H%M")
-          VERSION_CODE=$(date -u +"%Y%m%d%H%M")
+          # %y%j%H%M = 2-digit year + day-of-year + HHMM = max ~991440 (always < 2147483647)
+          VERSION_CODE=$(date -u +"%y%j%H%M")
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
