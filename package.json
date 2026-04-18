@@ -10,18 +10,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@capacitor/android": "^5.7.8",
-    "@capacitor/app": "^5.0.8",
-    "@capacitor/camera": "^5.0.10",
-    "@capacitor/cli": "^5.7.8",
-    "@capacitor/clipboard": "^5.0.8",
-    "@capacitor/core": "^5.7.8",
-    "@capacitor/filesystem": "^5.2.2",
-    "@capacitor/haptics": "^5.0.8",
-    "@capacitor/network": "^5.0.8",
-    "@capacitor/preferences": "^5.0.8",
-    "@capacitor/splash-screen": "^5.0.8",
-    "@capacitor/status-bar": "^5.0.8"
+    "@capacitor/android": "^7.6.2",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/camera": "^7.0.5",
+    "@capacitor/cli": "^7.6.2",
+    "@capacitor/clipboard": "^7.0.4",
+    "@capacitor/core": "^7.6.2",
+    "@capacitor/filesystem": "^7.1.8",
+    "@capacitor/haptics": "^7.0.5",
+    "@capacitor/network": "^7.0.4",
+    "@capacitor/preferences": "^7.0.4",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6"
   },
   "devDependencies": {
     "typescript": "^6.0.3"
