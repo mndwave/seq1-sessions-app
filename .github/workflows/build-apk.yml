@@ -45,7 +45,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Sync Capacitor (copies config into Android project)
-        run: npx cap sync android --no-open
+        run: npx cap sync android
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
