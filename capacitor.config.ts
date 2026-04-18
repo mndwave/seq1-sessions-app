@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '1.0.3';
+export const APP_VERSION = '1.0.4';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
@@ -17,17 +17,22 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
   },
   android: {
-    // Allow mixed content is off — sessions.seq1.net is HTTPS only.
     allowMixedContent: false,
-    // Capture input is needed for the voice recording UI.
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    // Prevent overscroll glow/bounce effect — this is an app, not a webpage.
+    overScrollMode: 'never',
   },
   plugins: {
-    // Filesystem plugin: used for buffering voice chunks locally.
-    Filesystem: {
-      // Store voice chunks in the app's private cache directory.
-      // Survives app backgrounding; cleared when user uninstalls.
+    SplashScreen: {
+      // Dark background matching stone-950 — no white flash while WebView loads.
+      backgroundColor: '#0c0a09',
+      // We call SplashScreen.hide() programmatically once content is ready.
+      autoHide: false,
+      // Instant show (app launch), smooth fade out when we hide.
+      launchShowDuration: 0,
+      splashFullScreen: true,
+      splashImmersive: true,
     },
   },
 };
