@@ -65,12 +65,12 @@ jobs:
           sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
           echo "Stamped versionCode=$VERSION_CODE versionName=$VERSION_NAME"
 
-      - name: Build Debug APK
+      - name: Build Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk seq1-sessions.apk
+        run: cp android/app/build/outputs/apk/release/app-release-unsigned.apk seq1-sessions.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
