@@ -16,14 +16,28 @@ on:
         required: false
         default: 'Manual trigger'
 
+permissions:
+  contents: write  # required to create GitHub Releases
+
 jobs:
   build:
-    name: Build Debug APK
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        run: |
+          # Date-based version: YYYY.MM.DD.HHMM — Obtainium uses this to detect updates
+          VERSION=$(date -u +"%Y.%m.%d.%H%M")
+          VERSION_CODE=$(date -u +"%Y%m%d%H%M")
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION (code: $VERSION_CODE)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -49,24 +63,36 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # Disable WebContentsDebugging in production builds
       - name: Disable WebContents debug flag
         run: sed -i 's/webContentsDebuggingEnabled: true/webContentsDebuggingEnabled: false/' capacitor.config.ts
+
+      - name: Stamp version into build.gradle
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
+          echo "Stamped versionCode=$VERSION_CODE versionName=$VERSION_NAME"
 
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: seq1-sessions-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 90
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk seq1-sessions.apk
 
-      # Upload to R2 so sessions.seq1.net/app/download always serves the latest.
-      # All ${{ }} expressions are passed via env vars to avoid injection risk.
-      - name: Upload APK to R2
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: seq1-sessions ${{ steps.version.outputs.name }}
+          body: Automated build
+          files: seq1-sessions.apk
+          fail_on_unmatched_files: true
+
+      # Keep R2 upload as fallback — sessions.seq1.net/app still works
+      - name: Upload to R2
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -77,24 +103,22 @@ jobs:
           pip install awscli --quiet
           aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
           aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
-          APK=android/app/build/outputs/apk/debug/app-debug.apk
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          # Versioned copy for rollback
-          aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-${COMMIT_SHA}.apk" \
+          aws s3 cp seq1-sessions.apk "s3://${R2_BUCKET}/app/seq1-sessions-${COMMIT_SHA}.apk" \
             --endpoint-url "$ENDPOINT" --region auto \
             --content-type "application/vnd.android.package-archive"
-          # Latest pointer — what the download page links to
-          aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
+          aws s3 cp seq1-sessions.apk "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
             --endpoint-url "$ENDPOINT" --region auto \
             --content-type "application/vnd.android.package-archive"
-          echo "Uploaded: seq1-sessions-latest.apk (commit ${COMMIT_SHA})"
 
       - name: Build summary
         env:
-          COMMIT_SHA: ${{ github.sha }}
+          VERSION: ${{ steps.version.outputs.name }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           {
             echo "## APK Build Complete"
-            echo "- Commit: ${COMMIT_SHA}"
-            echo "- Download: https://media.seq1.net/app/seq1-sessions-latest.apk"
+            echo "- Version: $VERSION"
+            echo "- GitHub Release: $TAG"
+            echo "- R2: https://media.seq1.net/app/seq1-sessions-latest.apk"
           } >> "$GITHUB_STEP_SUMMARY"
