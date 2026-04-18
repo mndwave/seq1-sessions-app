@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '1.0.4';
+export const APP_VERSION = '1.0.5';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
