@@ -1,6 +1,7 @@
 package net.seq1.sessions;
 
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -17,6 +18,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Set bar colours before super.onCreate so they apply from the first frame.
+        // styles.xml alone is overridden by Theme.SplashScreen; Window API is authoritative.
+        getWindow().setStatusBarColor(Color.parseColor("#0c0a09"));
+        getWindow().setNavigationBarColor(Color.parseColor("#0c0a09"));
+
         // Register Nostr/Amber bridge plugin before super.onCreate
         registerPlugin(NostrSignerPlugin.class);
         super.onCreate(savedInstanceState);
