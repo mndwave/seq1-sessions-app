@@ -3,7 +3,6 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
@@ -13,10 +12,18 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Match AppLoader bg so bars are correct colour from first frame -->
+        <item name="android:statusBarColor">#0c0a09</item>
+        <item name="android:navigationBarColor">#0c0a09</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
-
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Set bar colours at OS level — before any JS runs, prevents grey flash -->
+        <item name="android:statusBarColor">#0c0a09</item>
+        <item name="android:navigationBarColor">#0c0a09</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
+
 </resources>
