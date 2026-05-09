@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.2.0';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
@@ -28,14 +28,14 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      // Dark background matching stone-950 — no white flash while WebView loads.
+      // Disabled: launchShowDuration 0 means the native splash is never shown.
+      // The AppLoader in sessions.seq1.net handles the entire loading animation
+      // in the web layer — no native/web handoff, no immersive bar flash.
+      // backgroundColor still sets the WebView background colour so there is no
+      // white flash while the WebView initialises before the first paint.
       backgroundColor: '#0c0a09',
-      // We call SplashScreen.hide() programmatically once content is ready.
-      autoHide: false,
-      // Instant show (app launch), smooth fade out when we hide.
       launchShowDuration: 0,
-      splashFullScreen: true,
-      splashImmersive: true,
+      autoHide: true,
     },
   },
 };
