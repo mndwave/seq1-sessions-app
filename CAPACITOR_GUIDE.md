@@ -113,28 +113,27 @@ in `build.gradle`). Debug APKs cause the Obtainium signing cert trap (see above)
 
 ---
 
-## 🚨 GitHub Repository Not Yet Set Up (as of 2026-04-17)
+## ✅ GitHub Actions — Active (set up 2026-05-09)
 
-The `build-apk.yml` GitHub Actions workflow is written and ready, but `seq1-sessions-app` currently
-only has Gitea remotes (`gitea56`, `giteat13`). **GitHub Actions will not trigger until the repo
-is on GitHub.**
+`git push origin main` triggers a build automatically. The workflow:
+1. Stamps date-based version (YYYY.MM.DD.HHMM) into build.gradle
+2. Signs with the release keystore (secrets set 2026-05-15)
+3. Creates a GitHub Release with the APK attached
+4. Obtainium reads from GitHub Releases to detect updates
 
-**TODO (Monday 2026-04-22):**
-1. Create `github.com/mndwave/seq1-sessions-app` (private)
-2. Add a GitHub SSH key: `ssh-keygen -t ed25519 -C "seq1-sessions-app" -f ~/.ssh/seq1_sessions_github_key`
-3. Add deploy key to GitHub repo (Settings → Deploy keys → write access)
-4. Add to `~/.ssh/config`: `Host github.com-seq1-sessions` pointing at the new key
-5. `cd ~/seq1-sessions-app && git remote add origin git@github.com-seq1-sessions:mndwave/seq1-sessions-app.git`
-6. Add GitHub Actions secrets: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
-   (same R2 credentials used in other repos — see `~/.claude/includes/api-credentials.includes`)
-7. `git push origin main` — first push triggers APK rebuild with camera plugin
+**Signing secrets** (all set — do not need to redo):
+`KEYSTORE_BASE64` · `KEYSTORE_PASSWORD` · `KEY_ALIAS` · `KEY_PASSWORD`
 
-Until then, APK builds must be done locally (requires Java 17 — `sudo apt-get install openjdk-17-jdk`)
-or triggered manually via `gh workflow run` once the repo is on GitHub.
+**Release keystore:** `~/seq1-sessions-app/seq1-sessions-release.keystore`
+Generated 2026-05-15. Credentials in `~/seq1-healer/global.conf` under `[seq1_sessions_app]`.
+**⚠️ Never delete this file — loss means you cannot update the installed app without users uninstalling.**
 
-**Current APK status:** v1.0.2 is the last built APK (`media.seq1.net/app/seq1-sessions-1.0.2.apk`).
-v2.0.0 source (Capacitor 8) is ready but the APK has not yet been built — awaiting GitHub Actions
-setup (2026-04-22). All @capacitor/* plugins are now v8; includes @capacitor/keyboard (new in Cap 8).
+**Triggering a build manually (no code change):**
+```bash
+export GH_TOKEN=<mndwave_pat>  # see global.conf [github] mndwave_pat
+gh workflow run build-apk.yml --repo mndwave/seq1-sessions-app
+gh run list --repo mndwave/seq1-sessions-app --limit 3
+```
 
 ## GitHub Actions secrets required
 
@@ -725,3 +724,57 @@ from the `BUILD_KEYSTORE_BASE64` secret — this produces the correctly signed r
 | `versionName` mismatch | Obtainium always prompts to update | Obtainium compares extracted filename version vs installed versionName | Keep all three version constants identical |
 | `window.nostr` used in APK context | Amber approval dialog loop on every page load | NIP-55 designed for user-facing ops, not HTTP auth tokens | Skip `window.nostr` when `window.Capacitor` is set |
 | Launcher icon cache | Icon still old after confirmed fresh install | Launcher caches icon bitmaps independently of APK | Clear launcher app cache or restart device |
+
+---
+
+## App Icon — S1s SEQ1 Branding (updated 2026-05-15)
+
+### Design
+
+- **Text:** `S1s` — "S1" italic (matching the S1 badge in boldthin.gs admin), lowercase "s" upright (for Sessions)
+- **Font:** Poppins 800 — same as the SEQ1 S1 assignee badge
+- **Colour:** `#f0e6c8` warm cream, dark bg `#0F0F15`
+- **Glow:** `text-shadow: 0 0 8px rgba(240,230,200,0.55), 0 0 22px rgba(240,230,200,0.22), 0 0 50px rgba(240,230,200,0.08)`
+- **Safe for circle crop:** text sits within the inscribed circle at all densities
+
+### Source files
+
+- Design HTML: `/tmp/seq1sessions-final.html` (regenerate from here if changes needed)
+- Reference PNG: `~/seq1-healer/seq1sessions-final-512.png` (512×512 master)
+
+### Regenerating icons (if you need to update the design)
+
+```bash
+# 1. Edit /tmp/seq1sessions-final.html, start a local server, screenshot via Playwright
+# 2. Copy result to ~/seq1-healer/seq1sessions-final-512.png
+
+# 3. Generate all mipmap sizes
+RES=~/seq1-sessions-app/android/app/src/main/res
+SRC=~/seq1-healer/seq1sessions-final-512.png
+
+for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+  case $density in mdpi) s=48;; hdpi) s=72;; xhdpi) s=96;; xxhdpi) s=144;; xxxhdpi) s=192;; esac
+  convert "$SRC" -resize ${s}x${s} "$RES/mipmap-${density}/ic_launcher.png"
+  convert "$SRC" -resize ${s}x${s} "$RES/mipmap-${density}/ic_launcher_round.png"
+done
+
+for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+  case $density in mdpi) s=108;; hdpi) s=162;; xhdpi) s=216;; xxhdpi) s=324;; xxxhdpi) s=432;; esac
+  convert "$SRC" -resize ${s}x${s} "$RES/mipmap-${density}/ic_launcher_foreground.png"
+done
+
+# 4. Commit and push — GitHub Actions builds the APK
+cd ~/seq1-sessions-app
+git add android/app/src/main/res/mipmap-*/ic_launcher*.png
+git commit -m "feat(icon): ..."
+git push origin main
+```
+
+### Adaptive icon architecture
+
+Android 8+ uses the adaptive icon defined in `mipmap-anydpi-v26/ic_launcher.xml`:
+- **Background layer:** `@color/ic_launcher_background` → `#0F0F15` (values/ic_launcher_background.xml)
+- **Foreground layer:** `@mipmap/ic_launcher_foreground` → the resized PNG at each density
+
+This replaced the old `@drawable/ic_launcher_foreground` vector (which was the `>_` terminal prompt).
+Legacy Android (<8) uses `mipmap-*/ic_launcher.png` directly.
