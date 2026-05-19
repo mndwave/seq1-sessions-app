@@ -54,6 +54,9 @@
     <!-- Vibration: tactile feedback on tap-to-record press -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Android 13+ (API 33+): required to show notifications at runtime -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Camera: direct native camera access via @capacitor/camera plugin -->
     <uses-permission android:name="android.permission.CAMERA" />
 

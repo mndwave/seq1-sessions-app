@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '2.3.0';
+export const APP_VERSION = '2.4.0';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
@@ -36,6 +36,21 @@ const config: CapacitorConfig = {
       backgroundColor: '#0c0a09',
       launchShowDuration: 0,
       autoHide: true,
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#14b8a6',
+      sound: 'beep.wav',
+      channels: [
+        {
+          id: 'voice-delivery',
+          name: 'Voice Transcription',
+          description: 'Delivered when a voice recording has been transcribed',
+          importance: 4,
+          visibility: 1,
+          vibration: true,
+        },
+      ],
     },
   },
 };
