@@ -54,6 +54,14 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      # Caches the Gradle wrapper distribution + dependencies across runs and adds
+      # download robustness. Without this the wrapper re-fetches gradle-8.12-all.zip
+      # from GitHub's distribution server on every build — a transient 504 from that
+      # server broke run 27121747590 (2026-06-08) even though the commit was sound.
+      # Caching the dist removes that single point of network failure (healer:327b2d8b).
+      - name: Set up Gradle (cache wrapper dist + deps)
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
