@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 // Bump this when making a native change that requires an APK rebuild.
 // Format: MAJOR.MINOR.PATCH — Obtainium uses this to detect updates.
-export const APP_VERSION = '2.5.0';
+export const APP_VERSION = '2.6.0';
 
 const config: CapacitorConfig = {
   appId: 'net.seq1.sessions',
@@ -18,7 +18,13 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
-    captureInput: true,
+    // captureInput was on for the in-app record button, but it swaps in Capacitor's
+    // simplified InputConnection (built for discrete JS key events), which drops the
+    // bulk commitText() calls third-party IME voice-typing (e.g. FUTO Keyboard STT)
+    // uses to insert a whole transcribed phrase at once — so external voice dictation
+    // silently failed to land in the message textarea. Off restores the standard
+    // InputConnection; the in-app record button doesn't depend on this flag.
+    captureInput: false,
     webContentsDebuggingEnabled: false,
     // Prevent overscroll glow/bounce effect — this is an app, not a webpage.
     overScrollMode: 'never',
