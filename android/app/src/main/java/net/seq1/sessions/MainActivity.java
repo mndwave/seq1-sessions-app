@@ -3,12 +3,15 @@ package net.seq1.sessions;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginHandle;
 
 public class MainActivity extends BridgeActivity {
 
@@ -52,5 +55,25 @@ public class MainActivity extends BridgeActivity {
                 super.onReceivedError(view, request, error);
             }
         });
+    }
+
+    // VOLUME-BUTTON-STILL-JUST-VOLUME-2026-08-27: claim VOLUME_UP/VOLUME_DOWN here, ahead of the
+    // view hierarchy entirely, rather than via a WebView.OnKeyListener (see
+    // HardwareVolumeButtonsPlugin's class doc for why that didn't work on-device). This is the
+    // standard Android technique for apps that repurpose hardware volume keys.
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            PluginHandle handle = getBridge().getPlugin("HardwareVolumeButtons");
+            if (handle != null) {
+                Plugin instance = handle.getInstance();
+                if (instance instanceof HardwareVolumeButtonsPlugin
+                        && ((HardwareVolumeButtonsPlugin) instance).handleKeyEvent(event)) {
+                    return true;
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event);
     }
 }
