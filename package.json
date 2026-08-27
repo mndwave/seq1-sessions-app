@@ -12,7 +12,6 @@
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor-community/keep-awake": "^8.0.1",
-    "@capacitor-community/volume-buttons": "^8.0.1",
     "@capacitor/android": "8.5.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^8.2.0",

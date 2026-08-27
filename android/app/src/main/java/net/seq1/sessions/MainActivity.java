@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
 
         // Register Nostr/Amber bridge plugin before super.onCreate
         registerPlugin(NostrSignerPlugin.class);
+        registerPlugin(HardwareVolumeButtonsPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Replace the WebViewClient with one that intercepts main-frame load
