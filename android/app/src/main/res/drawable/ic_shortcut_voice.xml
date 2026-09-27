@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcut icon: "Launch with voice" — teal microphone on the app's dark background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#0c0a09"
+        android:pathData="M24,0A24,24 0,1 1,24 48A24,24 0,1 1,24 0Z" />
+    <!-- Mic capsule -->
+    <path
+        android:fillColor="#14b8a6"
+        android:pathData="M24,12C21.79,12 20,13.79 20,16L20,24C20,26.21 21.79,28 24,28C26.21,28 28,26.21 28,24L28,16C28,13.79 26.21,12 24,12Z" />
+    <!-- Stand + base -->
+    <path
+        android:fillColor="#14b8a6"
+        android:pathData="M31,23L29,23L29,24C29,26.76 26.76,29 24,29C21.24,29 19,26.76 19,24L19,23L17,23L17,24C17,27.53 19.61,30.43 23,30.92L23,34L19,34L19,36L29,36L29,34L25,34L25,30.92C28.39,30.43 31,27.53 31,24Z" />
+</vector>

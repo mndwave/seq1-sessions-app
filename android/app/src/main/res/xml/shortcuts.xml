@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Static home-screen App Shortcuts (long-press the launcher icon).
+  Each intent carries a `seq1_action` extra; MainActivity turns it into
+  https://sessions.seq1.net/?action=<value>&t=<ms>, and the web app's
+  sessions page drives the launch FAB from that query param.
+  Allowed values (must stay in sync with MainActivity.ALLOWED_ACTIONS and
+  admin-react app/sessions/page.tsx): voice-launch, new-session, record-armed.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="voice_launch"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_voice"
+        android:shortcutShortLabel="@string/shortcut_voice_short"
+        android:shortcutLongLabel="@string/shortcut_voice_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="net.seq1.sessions"
+            android:targetClass="net.seq1.sessions.MainActivity">
+            <extra android:name="seq1_action" android:value="voice-launch" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="new_session"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_session"
+        android:shortcutShortLabel="@string/shortcut_session_short"
+        android:shortcutLongLabel="@string/shortcut_session_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="net.seq1.sessions"
+            android:targetClass="net.seq1.sessions.MainActivity">
+            <extra android:name="seq1_action" android:value="new-session" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="record_armed"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_record"
+        android:shortcutShortLabel="@string/shortcut_record_short"
+        android:shortcutLongLabel="@string/shortcut_record_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="net.seq1.sessions"
+            android:targetClass="net.seq1.sessions.MainActivity">
+            <extra android:name="seq1_action" android:value="record-armed" />
+        </intent>
+    </shortcut>
+
+</shortcuts>

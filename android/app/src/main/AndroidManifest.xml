@@ -24,6 +24,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Long-press home-screen App Shortcuts. launchMode="singleTask" above means a
+                 shortcut tapped while the app is already running is delivered to
+                 MainActivity.onNewIntent rather than starting a second instance. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <provider
