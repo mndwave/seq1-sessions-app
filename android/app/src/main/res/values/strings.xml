@@ -6,6 +6,8 @@
     <string name="custom_url_scheme">net.seq1.sessions</string>
 
     <!-- Home-screen App Shortcuts (res/xml/shortcuts.xml) -->
+    <string name="shortcut_resume_short">Resume</string>
+    <string name="shortcut_resume_long">Resume last session</string>
     <string name="shortcut_voice_short">Voice</string>
     <string name="shortcut_voice_long">Launch with voice</string>
     <string name="shortcut_session_short">New session</string>

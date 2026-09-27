@@ -29,7 +29,7 @@ public class MainActivity extends BridgeActivity {
      * extra from another app cannot inject into the URL.
      */
     private static final Set<String> ALLOWED_ACTIONS = new HashSet<>(
-        Arrays.asList("voice-launch", "new-session", "record-armed")
+        Arrays.asList("voice-launch", "new-session", "record-armed", "resume-session")
     );
 
     private static final String DEFAULT_SERVER_URL = "https://sessions.seq1.net";

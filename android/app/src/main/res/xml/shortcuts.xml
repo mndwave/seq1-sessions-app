@@ -5,9 +5,23 @@
   https://sessions.seq1.net/?action=<value>&t=<ms>, and the web app's
   sessions page drives the launch FAB from that query param.
   Allowed values (must stay in sync with MainActivity.ALLOWED_ACTIONS and
-  admin-react app/sessions/page.tsx): voice-launch, new-session, record-armed.
+  admin-react app/sessions/page.tsx): voice-launch, new-session, record-armed, resume-session.
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="resume_session"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_resume"
+        android:shortcutShortLabel="@string/shortcut_resume_short"
+        android:shortcutLongLabel="@string/shortcut_resume_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="net.seq1.sessions"
+            android:targetClass="net.seq1.sessions.MainActivity">
+            <extra android:name="seq1_action" android:value="resume-session" />
+        </intent>
+    </shortcut>
 
     <shortcut
         android:shortcutId="voice_launch"

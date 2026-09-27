@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcut icon: "Resume last session" — teal rewind/history arrow on the app's dark background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#0c0a09"
+        android:pathData="M24,0A24,24 0,1 1,24 48A24,24 0,1 1,24 0Z" />
+    <path
+        android:fillColor="#14b8a6"
+        android:pathData="M24,13A11,11 0,1 1,13.4 20.3L16.2,21.2A8,8 0,1 0,24 16A8,8 0,0 0,18.1 18.5L21,21.3L12,23L11,14L14.2,17.1A11,11 0,0 1,24 13Z" />
+</vector>
