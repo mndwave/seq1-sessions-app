@@ -40,7 +40,7 @@ Only use static bundle if you genuinely need offline-first behaviour.
 | Backend seq1-healer changes | ❌ No |
 | `admin-react/` code changes (including this guide) | ❌ No |
 
-The GitHub Actions workflow (`build-apk.yml`) is path-scoped to enforce this automatically — it only triggers on `android/**` and `capacitor.config.ts`, never on web code paths.
+There is no CI (the path-scoped `build-apk.yml` GitHub Actions workflow was removed 2026-09-09, commit `c0bcde6` — cost-driven). Every APK release is triggered deliberately — see **Building and releasing the APK** below. A native-layer change that is pushed but never released silently never reaches the phone.
 
 **Why this matters for day-to-day work on SEQ1 Sessions:**
 `sessions.seq1.net` is the live web app. When you fix a bug or add a feature there, the APK users
@@ -50,99 +50,54 @@ genuinely native changes (a new Android permission, an icon update, a new hardwa
 
 ## APK distribution
 
-- **Latest APK:** `https://media.seq1.net/app/seq1-sessions-latest.apk`
-- **Download page:** `https://sessions.seq1.net/app`
-- **Versioned builds:** `https://media.seq1.net/app/seq1-sessions-{sha}.apk` (90-day retention)
+- **Channel:** GitHub Releases on `mndwave/seq1-sessions-app` (the `origin` remote). Obtainium watches this repo's releases.
+- **Asset name:** always the fixed constant `seq1-sessions.apk` (not versioned) — every release uses this exact name.
+- **Tag / release name:** `vYYYY.MM.DD.HHMM` / `seq1-sessions YYYY.MM.DD.HHMM`, `target_commitish: main`.
+- **Latest release:** `https://github.com/mndwave/seq1-sessions-app/releases/latest`
 
-## Local Build — Temporary Method Until GitHub CI Is Wired Up
+**Retired (do not resurrect):** the `sessions.seq1.net/app` download page + `/app/obtainium.json` (removed 2026-04-18, seq1-healer commit `6e93d1e5f5`) and the R2 copies at `media.seq1.net/app/seq1-sessions-*.apk` (both 404). The `gitea56`/`giteat13` remotes on this repo are not release channels — never publish releases there.
 
-Until `seq1-sessions-app` is on GitHub and Actions are configured, build the APK locally.
+## Building and releasing the APK
 
-### Requirements
+### ✅ Canonical: `build_and_release_seq1_sessions_apk` (healer MCP tool)
 
-- Java 17: `sudo apt-get install openjdk-17-jdk`
-- Android SDK: set `ANDROID_HOME` (GitHub Actions uses `android-actions/setup-android@v3`)
-- AWS CLI: `pip install awscli` (for R2 upload)
-- R2 credentials from `~/.claude/includes/api-credentials.includes`
+Added 2026-09-27 (healer:7f26dd2f). Standing pre-authorised action — no per-run approval needed.
 
-### Build and upload (release APK)
+| Param | Default | Meaning |
+|---|---|---|
+| `bump` | `patch` | Semver piece of `APP_VERSION` to bump (`patch`/`minor`/`major`) |
+| `release_notes` | generic note | GitHub release body |
+| `dry_run` | `false` | Build + verify only; skip commit/push/publish |
 
-```bash
-cd ~/seq1-sessions-app
+Sequence the tool runs:
+1. Preflight — clean tree, on `main`, in sync with `origin/main`.
+2. Bump `APP_VERSION` in `capacitor.config.ts` + `versionName`/`versionCode` in `android/app/build.gradle`.
+3. Extract the `seq1sessions` keystore credentials from the healer config inside the tool (never surfaced in its output) and run `./gradlew assembleRelease`.
+4. Verify the APK is signed (`apksigner verify --print-certs`, expect `CN=SEQ1 Sessions`) and carries the expected version (`aapt2 dump badging`).
+5. Commit + push the version bump.
+6. Create the GitHub release and upload `seq1-sessions.apk` (one retry on the known transient `uploads.github.com` SSL flake).
+7. Re-fetch `/releases/latest` to confirm tag + asset landed.
 
-# 1. Sync capacitor config into Android project
-npx cap sync android --no-open
+Publishing happens last, only after the APK is verified — a failure earlier leaves nothing half-published.
 
-# 2. Build release APK (requires keystore at seq1-sessions-release.keystore)
-cd android
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew assembleRelease --no-daemon
-cd ..
+### Manual fallback (tool unavailable)
 
-# 3. The APK is at:
-APK="android/app/build/outputs/apk/release/app-release.apk"
+Full step-by-step: `~/seq1-intelligence/memory/seq1-healer/project-seq1-sessions-app-manual-release-process-2026-09-27.md`. Key rules:
 
-# 4. Upload to R2
-R2_ACCOUNT_ID="..."        # from api-credentials.includes
-R2_ACCESS_KEY_ID="..."
-R2_SECRET_ACCESS_KEY="..."
-R2_BUCKET="media"
-ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-VERSION=$(grep 'versionName' android/app/build.gradle | grep -o '"[^"]*"' | tr -d '"')
+- **`versionCode` uses the date scheme `date -u +%y%j%H%M`** (e.g. `262701755`) — never a plain increment. A lower `versionCode` is treated as a downgrade and refused.
+- **Never Read/cat/grep the healer config's credentials directly** (transcript-leak guard). Extract `KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` (and the GitHub PAT) inside a throwaway script that exports them to a single `./gradlew assembleRelease` subprocess without echoing them.
+- Android SDK lives at `~/android-sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`); `build-tools/35.0.0/{apksigner,aapt2}` for verification. Verify signed + versioned before publishing — a green Gradle exit is not proof.
+- Publish via the GitHub API: create release (tag `vYYYY.MM.DD.HHMM`), upload asset as `seq1-sessions.apk`, confirm via `/releases/latest`.
+- Commit the version bump and `git push origin main` (this repo has no `git-safe-commit` wrapper).
 
-aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
-aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+### Requirements (host)
 
-aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-${VERSION}.apk" \
-  --endpoint-url "$ENDPOINT" --region auto \
-  --content-type "application/vnd.android.package-archive"
+- Java 17 (`/usr/lib/jvm/java-17-openjdk-amd64`)
+- Android SDK at `~/android-sdk` (matches `android/local.properties`)
+- Release keystore at `~/seq1-sessions-app/seq1-sessions-release.keystore`
 
-aws s3 cp "$APK" "s3://${R2_BUCKET}/app/seq1-sessions-latest.apk" \
-  --endpoint-url "$ENDPOINT" --region auto \
-  --content-type "application/vnd.android.package-archive"
-
-echo "Uploaded seq1-sessions-${VERSION}.apk and latest"
-```
-
-Then update `CURRENT_VERSION` in `admin-react/app/app/page.tsx` to match and push.
-
-### ⚠️ Note on build-apk.yml
-
-The GitHub Actions workflow currently runs `assembleDebug` — a debug build. Once the GitHub repo
-is set up, update the workflow to run `assembleRelease` instead (it already has the signing config
-in `build.gradle`). Debug APKs cause the Obtainium signing cert trap (see above).
-
----
-
-## ✅ GitHub Actions — Active (set up 2026-05-09)
-
-`git push origin main` triggers a build automatically. The workflow:
-1. Stamps date-based version (YYYY.MM.DD.HHMM) into build.gradle
-2. Signs with the release keystore (secrets set 2026-05-15)
-3. Creates a GitHub Release with the APK attached
-4. Obtainium reads from GitHub Releases to detect updates
-
-**Signing secrets** (all set — do not need to redo):
-`KEYSTORE_BASE64` · `KEYSTORE_PASSWORD` · `KEY_ALIAS` · `KEY_PASSWORD`
-
-**Release keystore:** `~/seq1-sessions-app/seq1-sessions-release.keystore`
-Generated 2026-05-15. Credentials in `~/seq1-healer/global.conf` under `[seq1_sessions_app]`.
+**Release keystore:** generated 2026-05-15. Credentials live in `~/seq1-healer/global.conf` (`key_alias = "seq1sessions"` block). Not committed (`*.keystore` in `.gitignore`).
 **⚠️ Never delete this file — loss means you cannot update the installed app without users uninstalling.**
-
-**Triggering a build manually (no code change):**
-```bash
-export GH_TOKEN=<mndwave_pat>  # see global.conf [github] mndwave_pat
-gh workflow run build-apk.yml --repo mndwave/seq1-sessions-app
-gh run list --repo mndwave/seq1-sessions-app --limit 3
-```
-
-## GitHub Actions secrets required
-
-| Secret | Value source |
-|---|---|
-| `R2_ACCOUNT_ID` | Cloudflare R2 account ID |
-| `R2_ACCESS_KEY_ID` | R2 API token (read+write on media bucket) |
-| `R2_SECRET_ACCESS_KEY` | R2 API token secret |
-| `R2_BUCKET` | `media` (the seq1 media R2 bucket) |
 
 ## Visual parity
 
@@ -162,9 +117,8 @@ Set `android:windowSoftInputMode` and safe area insets if this causes layout iss
 5. `mkdir -p www && echo '<html><body>Loading...</body></html>' > www/index.html`
 6. `npx cap add android`
 7. Edit `android/app/src/main/AndroidManifest.xml`: add `RECORD_AUDIO`, `INTERNET` etc.
-8. Copy `.github/workflows/build-apk.yml` and update secrets
-9. Add R2 secrets to GitHub repo settings
-10. Push — GitHub Actions builds and uploads the APK
+8. Generate a release keystore and wire `signingConfigs.release` in `android/app/build.gradle` (env-var credentials, as here)
+9. Build `assembleRelease` and publish as a GitHub release with a fixed asset name (see **Building and releasing the APK** — adapt the MCP tool or follow the manual process; there is no CI template to copy)
 
 ## Android Icon — Complete Guide
 
@@ -268,12 +222,14 @@ The symptoms:
 
 **Fix (one-time migration):**
 1. Settings → Apps → SEQ1 Sessions → Uninstall (full uninstall, not "disable")
-2. Install the release APK fresh from `sessions.seq1.net/app`
+2. Install the release APK fresh from the latest GitHub release (`seq1-sessions.apk`)
 3. Obtainium will now track the release-signed version and updates will work
 
 **Prevention:** Never publish a debug APK to users. Once users have it installed, you can never push a release APK via update — they must manually uninstall first. Use `assembleRelease` from the start.
 
-### Obtainium version comparison
+### Obtainium version comparison (historical — HTML source, retired 2026-04-18)
+
+> Obtainium now tracks GitHub Releases (see **APK distribution**). With the GitHub source, what matters is that each release's `versionCode` strictly increases and `APP_VERSION`/`versionName` are bumped together — the release tool does both. Kept for context only:
 
 Obtainium HTML source type:
 1. Scrapes the source URL (e.g. `sessions.seq1.net/app`)
@@ -288,9 +244,6 @@ Obtainium HTML source type:
 | `1.0.2` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ✅ No prompt |
 | `1.0` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ❌ Always prompts |
 | `2` | `seq1-sessions-1.0.2.apk` | `1.0.2` | ❌ Always prompts |
-
-**Always keep `versionName` and the APK filename in sync.** The `CURRENT_VERSION` constant in `admin-react/app/app/page.tsx` and the `versionName` in `android/app/build.gradle` must be identical.
-
 ## Known anti-patterns
 
 ### ❌ Using `next export` for SSR apps
@@ -305,21 +258,20 @@ None of these can be statically exported. `server.url` is the correct approach.
 
 ### ❌ Rebuilding APK on every web push
 
-The whole point of Server URL mode is that you don't need to. If you add a path trigger 
-on `app/**` or `src/**`, you're rebuilding unnecessarily. Only trigger on `android/**` and 
-`capacitor.config.ts`.
+The whole point of Server URL mode is that you don't need to. Only release when `android/**` or
+`capacitor.config.ts` changed.
 
 ### ❌ Using `webContentsDebuggingEnabled: true` in production
 
 This allows any Chrome DevTools client to attach to the WebView remotely.
-The workflow strips this flag on production builds. Don't merge code with it set to `true`
-in a release branch.
+Nothing strips this flag automatically any more — keep it `false` in `capacitor.config.ts`
+before releasing.
 
-### ❌ Putting signing keys in the workflow file
+### ❌ Committing signing keys or credentials
 
-The debug build (`.apk`) is fine for internal distribution. For Play Store releases,
-you need a signed release build. Store the keystore as a GitHub encrypted secret,
-never in the repo.
+Never commit the keystore or its passwords. The keystore file stays untracked (`*.keystore` in
+`.gitignore`); the passwords live only in the healer config and are injected as env vars at
+build time.
 
 ### ❌ Assuming getUserMedia works the same as browser
 
@@ -338,9 +290,10 @@ seq1-sessions-app/
 ├── android/                     ← Generated by `npx cap add android`
 │   └── app/src/main/
 │       └── AndroidManifest.xml  ← Permissions — edit this, not the generated files
-└── .github/workflows/
-    └── build-apk.yml            ← Path-scoped trigger; uploads to R2
+└── seq1-sessions-release.keystore ← Untracked; never delete
 ```
+
+(No `.github/workflows/` — CI removed 2026-09-09.)
 
 ---
 
@@ -349,8 +302,8 @@ seq1-sessions-app/
 **Capacitor 8 migration applied 2026-04-18:** All @capacitor/* packages updated from v7 to v8. Key
 changes: `@capacitor/keyboard` added (keyboard UX improvements), `adjustMarginsForEdgeToEdge` removed
 (no longer in Cap 8 API — CSS env(safe-area-inset-*) handles insets directly), `proguard-android.txt`
-→ `proguard-android-optimize.txt` (AGP 9.0 compatibility). APK not yet rebuilt — pending GitHub
-Actions setup (see GitHub section above). v1.0.2 was the last built APK.
+→ `proguard-android-optimize.txt` (AGP 9.0 compatibility). (Historical snapshot — version numbers
+below are from 2026-04; current values are whatever the latest release bumped them to.)
 
 This section documents the confirmed-correct configuration. All 7 layers PASS. Do not change these
 without understanding the anti-pattern each one fixes.
@@ -380,8 +333,9 @@ buildTypes {
 }
 ```
 
-Signing credentials are stored as GitHub Actions secrets (`KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
-The keystore itself is base64-encoded as `KEYSTORE_BASE64` and decoded by the CI workflow before the Gradle build.
+Signing credentials (`KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) are injected as env vars at
+build time from the healer config by the release tool (or the manual fallback script). The keystore
+is read from disk at the path above. (The old GitHub Actions secrets are unused since CI was removed.)
 
 **Why this matters:** Android ties an installed app to its signing certificate. The debug keystore
 (shared across all Android devs) and the release keystore are different certificates. If a user has
@@ -397,21 +351,19 @@ Generated with: `keytool -genkey -v -keystore seq1-sessions-release.keystore -al
 
 ### Layer 2 — Version numbers in sync
 
-Three places must have identical version strings:
+Two places must have identical version strings (the release tool bumps both):
 
-| File | Key | Value |
-|---|---|---|
-| `android/app/build.gradle` | `versionName` | `"2.0.0"` |
-| `capacitor.config.ts` | `APP_VERSION` | `'2.0.0'` |
-| `admin-react/app/app/page.tsx` | `CURRENT_VERSION` | `'2.0.0'` |
+| File | Key |
+|---|---|
+| `android/app/build.gradle` | `versionName` |
+| `capacitor.config.ts` | `APP_VERSION` |
 
-**Why three places:** Obtainium scrapes the download page HTML for an APK link matching the regex
-`seq1-sessions-([0-9]+\.[0-9]+\.[0-9]+)\.apk`, extracts the version string, then compares it
-against the installed APK's `versionName` from `build.gradle`. If they differ even slightly
-(`1.0` vs `1.0.2`), Obtainium always sees a newer version available → permanent update loop.
+(The third place, `admin-react/app/app/page.tsx` `CURRENT_VERSION`, went away with the download
+page on 2026-04-18.)
 
-**`versionCode`** (`3`, an integer) is used by Android internally for update ordering. Increment it
-every release even if the patch number doesn't change. It must only ever go up.
+**`versionCode`** (an integer) is used by Android for update ordering and must only ever go up. It
+uses the date scheme `date -u +%y%j%H%M` (e.g. `262701755`) — never a plain increment, which would
+land below the CI-era values and be refused as a downgrade.
 
 ---
 
@@ -528,33 +480,16 @@ done
 
 ### Layer 7 — Obtainium configuration
 
-Obtainium scrapes `sessions.seq1.net/app` (the download page) to detect new versions.
+Obtainium tracks **GitHub Releases** on `mndwave/seq1-sessions-app`.
 
-| Setting | Value | Why |
-|---|---|---|
-| Source URL | `https://sessions.seq1.net/app` | SSR-rendered HTML contains APK links |
-| Source type | HTML | Not GitHub, not F-Droid |
-| APK link regex | `seq1-sessions-([0-9]+\.[0-9]+\.[0-9]+)\.apk` | Matches versioned filenames |
-| Version extraction | Same regex, group 1 | Extracts `1.0.2` from filename |
+| Setting | Value |
+|---|---|
+| Source URL | `https://github.com/mndwave/seq1-sessions-app` |
+| Source type | GitHub |
+| APK asset | `seq1-sessions.apk` (fixed name on every release) |
 
-One-tap import via: `https://sessions.seq1.net/app/obtainium.json`
-
-**Why SSR matters:** Obtainium fetches the HTML source and runs the regex against it. If the page
-were client-rendered (SPA), Obtainium would see an empty shell with no APK links. The Next.js page
-is server-rendered, so the `<a href="...seq1-sessions-1.0.2.apk">` tag is present in the initial
-HTML. This is why the source type is HTML, not JavaScript.
-
-**Alternative import path** (for users without Obtainium set up):
-```json
-// sessions.seq1.net/app/obtainium.json
-{
-  "id": "net.seq1.sessions",
-  "url": "https://sessions.seq1.net/app",
-  "author": "SEQ1",
-  "name": "SEQ1 Sessions",
-  "additionalSettings": "{\"filterRegExp\":\"seq1-sessions-([0-9]+\\\\.[0-9]+\\\\.[0-9]+)\\\\.apk\"}"
-}
-```
+The earlier HTML-scrape setup (source `sessions.seq1.net/app`, versioned filename regex,
+`/app/obtainium.json` one-tap import) was retired on 2026-04-18 when the download page was removed.
 
 ---
 
@@ -607,8 +542,8 @@ The launcher cache will self-correct through one of:
 - Manual cache clear as above
 - Some launchers re-validate their cache periodically (days, not weeks)
 
-**This requires no code changes.** The APK at `media.seq1.net/app/seq1-sessions-1.0.2.apk`
-has been verified to contain the correct `>_` icon at all layers.
+**This requires no code changes.** (Originally diagnosed 2026-04-17 against v1.0.2, whose APK was
+verified to contain the correct `>_` icon at all layers.)
 
 ---
 
@@ -626,8 +561,8 @@ again. This repeats forever.
 
 1. Settings → Apps → SEQ1 Sessions → Uninstall (full uninstall, not disable)
 2. In Obtainium: remove the SEQ1 Sessions entry
-3. Go to `sessions.seq1.net/app` in the browser
-4. Download and install the APK directly
+3. Open `https://github.com/mndwave/seq1-sessions-app/releases/latest` in the browser
+4. Download and install `seq1-sessions.apk` directly
 5. Re-add SEQ1 Sessions in Obtainium
 6. Future Obtainium updates will work (consistent release signing)
 
@@ -638,21 +573,16 @@ If the keystore is lost, existing users can never receive updates via Obtainium 
 update mechanism) — they must uninstall and reinstall manually.
 
 **Store the keystore file safely. It is NOT committed to git (`*.keystore` is in `.gitignore`).
-The keystore is stored as a base64-encoded GitHub Actions secret (`KEYSTORE_BASE64`). The
-credentials are stored as `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` secrets. Loss of the
+It lives only on this host at `~/seq1-sessions-app/seq1-sessions-release.keystore`; the
+`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` credentials live in the healer config. Loss of the
 keystore = can never update the app for existing users without full uninstall.**
 
-### Version number drift loop
+### Version drift / downgrade loop
 
-If `versionName` in `build.gradle` (`1.0.2`) doesn't exactly match what Obtainium's regex
-extracts from the filename (`1.0.2` from `seq1-sessions-1.0.2.apk`), Obtainium always thinks
-there's a newer version. They must be identical strings.
-
-| `versionName` | APK filename | Obtainium behaviour |
-|---|---|---|
-| `1.0.2` | `seq1-sessions-1.0.2.apk` | ✅ Sees match, no update prompt |
-| `1.0` | `seq1-sessions-1.0.2.apk` | ❌ Always prompts (strings differ) |
-| `2` | `seq1-sessions-1.0.2.apk` | ❌ Always prompts |
+With the GitHub Releases source, the failure mode is a `versionCode` that doesn't go up: Android
+refuses the install as a downgrade and Obtainium keeps re-prompting. Always use the date-based
+`versionCode` scheme (`date -u +%y%j%H%M`) — the release tool does this automatically. (The older
+`versionName`-vs-filename-regex drift loop only applied to the retired HTML-scrape source.)
 
 ---
 
@@ -695,21 +625,20 @@ used directly for HTTP auth signing. Amber is still used for Nostr identity oper
 
 ## Release Checklist — Before Publishing a New APK Version
 
-When bumping from e.g. `1.0.2` → `1.1.0`:
+- [ ] Native change is committed and pushed to `origin/main`; working tree clean
+- [ ] `webContentsDebuggingEnabled` is `false` in `capacitor.config.ts`
+- [ ] Run `build_and_release_seq1_sessions_apk` (optionally `dry_run: true` first) — it bumps
+      `APP_VERSION`/`versionName`/`versionCode`, builds, verifies signature + version, commits,
+      pushes and publishes
+- [ ] Confirm the result reports `release_verified: true`, or check
+      `https://github.com/mndwave/seq1-sessions-app/releases/latest` shows the new tag with
+      `seq1-sessions.apk` attached
+- [ ] Confirm Obtainium on the phone picks up the update
 
-- [ ] Update `versionName` in `android/app/build.gradle` (e.g. `"1.1.0"`)
-- [ ] Increment `versionCode` in `android/app/build.gradle` (e.g. `3`)
-- [ ] Update `APP_VERSION` in `capacitor.config.ts` (e.g. `'1.1.0'`)
-- [ ] Update `CURRENT_VERSION` in `admin-react/app/app/page.tsx` (e.g. `'1.1.0'`)
-- [ ] Verify all three match exactly
-- [ ] Push to `main` branch → GitHub Actions builds + uploads to R2
-- [ ] Verify APK appears at `https://media.seq1.net/app/seq1-sessions-1.1.0.apk`
-- [ ] Verify download page at `sessions.seq1.net/app` shows new version number
-- [ ] Verify Obtainium detects update (scrape test: `curl -s https://sessions.seq1.net/app | grep seq1-sessions`)
+Manual fallback: see **Building and releasing the APK → Manual fallback**.
 
 **DO NOT** publish a debug APK. Once users have it installed, updates won't work until they
-manually uninstall. The GitHub Actions workflow builds `assembleRelease` with the keystore
-from the `BUILD_KEYSTORE_BASE64` secret — this produces the correctly signed release APK.
+manually uninstall. Always `assembleRelease` with the release keystore.
 
 ---
 
@@ -721,7 +650,7 @@ from the `BUILD_KEYSTORE_BASE64` secret — this produces the correctly signed r
 | `<rect>` in vector drawable | AAPT build error | Android VectorDrawable doesn't support `<rect>` | Replaced with `<path>` coordinates |
 | Background `#FFFFFF` (white) | White background behind `>_` design | Capacitor default; never changed | Changed to `#1c1917` (stone-900) |
 | Debug APK distributed to users | Obtainium update loop forever | Signing cert mismatch; Android silently rejects update | Migrate: full uninstall → fresh release install |
-| `versionName` mismatch | Obtainium always prompts to update | Obtainium compares extracted filename version vs installed versionName | Keep all three version constants identical |
+| `versionName` mismatch | Obtainium always prompts to update | Obtainium compares extracted filename version vs installed versionName (HTML source, since retired) | Now: GitHub Releases source + date-based `versionCode`, bumped by the release tool |
 | `window.nostr` used in APK context | Amber approval dialog loop on every page load | NIP-55 designed for user-facing ops, not HTTP auth tokens | Skip `window.nostr` when `window.Capacitor` is set |
 | Launcher icon cache | Icon still old after confirmed fresh install | Launcher caches icon bitmaps independently of APK | Clear launcher app cache or restart device |
 
@@ -763,11 +692,13 @@ for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
   convert "$SRC" -resize ${s}x${s} "$RES/mipmap-${density}/ic_launcher_foreground.png"
 done
 
-# 4. Commit and push — GitHub Actions builds the APK
+# 4. Commit and push (pushing does NOT build — there is no CI)
 cd ~/seq1-sessions-app
 git add android/app/src/main/res/mipmap-*/ic_launcher*.png
 git commit -m "feat(icon): ..."
 git push origin main
+
+# 5. Release: run the build_and_release_seq1_sessions_apk healer MCP tool
 ```
 
 ### Adaptive icon architecture
