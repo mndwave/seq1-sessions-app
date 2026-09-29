@@ -1,5 +1,10 @@
 # Capacitor "Server URL" Pattern — seq1-sessions-app
 
+> 🚫 **DEPRECATED (Kyle, 2026-09-29).** This Capacitor shell is retired as the SEQ1 Sessions APK.
+> The Sessions app is now the native app in `~/seq1-sessions-native` (Kotlin/Compose, Amber auth).
+> Do NOT add native plugins, rebuild or release this APK. The guide below stays as the reference
+> pattern for the other server-URL shells (Randalls stays Capacitor).
+
 ## What this is
 
 A native Android APK that wraps `sessions.seq1.net` in a Capacitor WebView shell.
